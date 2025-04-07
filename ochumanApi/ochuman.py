@@ -112,44 +112,44 @@ class OCHuman():
             
         
         return img
-    
-    def toCocoFormart(self, subset='all', maxIouRange=(0., 1.), save_dir=None):
+
+    def toCocoFormart(self, subset='all', maxIouRange=(0., 1.), save_dir=None, only_complete_annotations=False):
         # maxIouRange: Moderate [0.5, 0.75), Hard [0.75, 1.]
-        assert self._filter in ['kpt&segm', 'segm&kpt']
+        # assert self._filter in ['kpt&segm', 'segm&kpt']
         assert subset in ['all', 'val', 'test']
-        
+
         # total 4731 Image; 8110 Persons.
         # val set: first 2500 Images
         # test set: last 2231 Images
         
-        dataset_json = {'annotations': [], 
-                        'categories': [{'supercategory': 'person', 
-                                          'id': 1, 
-                                          'name': 'person', 
-                                          'skeleton': [[16, 14], [14, 12], [17, 15], [15, 13], [12, 13], 
-                                                       [6, 12], [7, 13], [6, 7], [6, 8], [7, 9], [8, 10], 
-                                                       [9, 11], [2, 3], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7]],
-                                          'keypoints': ['nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear', 
-                                                        'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 
-                                                        'left_wrist', 'right_wrist', 'left_hip', 'right_hip', 'left_knee', 
+        dataset_json = {'annotations': [],
+                        'categories': [{'supercategory': 'person',
+                                        'id': 1,
+                                        'name': 'person',
+                                        'skeleton': [[16, 14], [14, 12], [17, 15], [15, 13], [12, 13],
+                                                    [6, 12], [7, 13], [6, 7], [6, 8], [7, 9], [8, 10],
+                                                    [9, 11], [2, 3], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7]],
+                                        'keypoints': ['nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
+                                                        'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+                                                        'left_wrist', 'right_wrist', 'left_hip', 'right_hip', 'left_knee',
                                                         'right_knee', 'left_ankle', 'right_ankle']
-                                         }], 
+                                        }],
                         'images': []
-                       }
-        annotation = {'image_id': None, 
-                      'area': None, 
-                      'num_keypoints': 0, 
-                      'iscrowd': 0, 
-                      'id': None, 
-                      'category_id': 1, 
-                      'keypoints': [], 
-                      'segmentation': [[]], 
-                      'bbox': []
-                     }
-        image = {'id': None, 
-                 'file_name': '0.jpg', 
-                 'height': None, 
-                 'width': None}
+                    }
+        annotation = {'image_id': None,
+                    'area': None,
+                    'num_keypoints': 0,
+                    'iscrowd': 0,
+                    'id': None,
+                    'category_id': 1,
+                    'keypoints': [],
+                    'segmentation': [[]],
+                    'bbox': []
+                    }
+        image = {'id': None,
+                'file_name': '0.jpg',
+                'height': None,
+                'width': None}
 
         if subset == 'all':
             imgIds = self.imgIds
@@ -165,12 +165,34 @@ class OCHuman():
             file_name = data['file_name']
             width = data['width']
             height = data['height']
-            
+
+            # Check if all annotations in this image have complete data
+            if only_complete_annotations:
+                all_complete = True
+                for anno in data['annotations']:
+                    bbox = anno['bbox']
+                    kpt = anno['keypoints']
+                    segm = anno['segms']
+                    max_iou = anno['max_iou']
+
+                    # Check if any annotation is missing bbox, keypoints, or segmentation
+                    if bbox is None or kpt is None or segm is None:
+                        all_complete = False
+                        break
+
+                    # Check if max_iou is within range
+                    if max_iou < maxIouRange[0] or max_iou >= maxIouRange[1]:
+                        all_complete = False
+                        break
+
+                if not all_complete:
+                    continue  # Skip this image
+
             image = {'id': IMGID, 
-                     'file_name': file_name, 
-                     'height': height, 
-                     'width': width}
-    
+                    'file_name': file_name, 
+                    'height': height, 
+                    'width': width}
+
             total_anno = 0
             for i, anno in enumerate(data['annotations']):
                 bbox = anno['bbox']
@@ -190,10 +212,10 @@ class OCHuman():
                 # 'keypoint_visible': {'missing': 0, 'vis': 1, 'self_occluded': 2, 'others_occluded': 3},
                 kptDef = self.dataset['keypoint_names']
                 kptDefCoco = ['nose', 
-                      'left_eye', 'right_eye', 'left_ear', 'right_ear', 
-                      'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 
-                      'left_wrist', 'right_wrist', 'left_hip', 'right_hip', 
-                      'left_knee', 'right_knee', 'left_ankle', 'right_ankle']
+                    'left_eye', 'right_eye', 'left_ear', 'right_ear',
+                    'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+                    'left_wrist', 'right_wrist', 'left_hip', 'right_hip',
+                    'left_knee', 'right_knee', 'left_ankle', 'right_ankle']
                 kptCoco = []
                 num_keypoints = 0
                 for i in range(len(kptDefCoco)):
@@ -215,15 +237,15 @@ class OCHuman():
                 segmCoco = maskencode
                 
                 annotation = {'image_id': IMGID, 
-                              'area': area, 
-                              'num_keypoints': num_keypoints, 
-                              'iscrowd': 0, 
-                              'id': ANNOID, 
-                              'category_id': 1, 
-                              'keypoints': kptCoco, 
-                              'segmentation': segmCoco, 
-                              'bbox': bboxCoco
-                             }
+                            'area': area, 
+                            'num_keypoints': num_keypoints, 
+                            'iscrowd': 0, 
+                            'id': ANNOID, 
+                            'category_id': 1, 
+                            'keypoints': kptCoco, 
+                            'segmentation': segmCoco, 
+                            'bbox': bboxCoco
+                            }
                 total_anno += 1
                 dataset_json['annotations'].append(annotation)
                 ANNOID += 1
@@ -231,19 +253,18 @@ class OCHuman():
             if total_anno > 0:
                 dataset_json['images'].append(image)
                 IMGID += 1
-                
+
         print ('convert OCHuman to COCO format done.', 
-               'total %d persons within'%len(dataset_json['annotations']), 
-               '%d images.'%len(dataset_json['images']))
-        
+            'total %d persons within'%len(dataset_json['annotations']), 
+            '%d images.'%len(dataset_json['images']))
+
         if save_dir:
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
-            with open('%s/ochuman_coco_format_%s_range_%.2f_%.2f.json'%(save_dir, 
-                                                                        subset, 
-                                                                        maxIouRange[0], 
+            with open('%s/ochuman_coco_format_%s_range_%.2f_%.2f.json'%(save_dir,
+                                                                        subset,
+                                                                        maxIouRange[0],
                                                                         maxIouRange[1]), 'w') as f:
                 json.dump(dataset_json, f)
         else:
             return dataset_json
-        
